@@ -1,0 +1,175 @@
+---
+title: "Credit Card fraud detection"
+author: "Aditya Lakkad"
+date: "22/09/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading the Dataset and claening the Data
+importing the data set from respective folder.
+```{r echo=TRUE}
+credit_card <- read.csv("E:\\SEM-5\\DSM\\Project\\creditcard.csv")
+```
+
+viewing data set
+```{r echo=TRUE}
+print(str(credit_card))
+```
+
+converting Class into factor, levels=(0,1) and getting summary of the data
+```{r echo=TRUE}
+credit_card$Class <- factor(credit_card$Class, levels=c(0,1))
+print(summary(credit_card))
+```
+
+Count the missing Values
+```{r echo=TRUE}
+print(sum(is.na(credit_card)))
+```
+So here data is clean and ready for the further process
+
+## Exploring the data
+Get the distribution of fraud and legit transaction in deta set
+```{r echo=TRUE}
+print(table(credit_card$Class))
+```
+
+finding the probability of the data of fraud and legit transection
+```{r echo=TRUE}
+print(prop.table(table(credit_card$Class)))
+```
+
+plotting a piechart of creditcard transaction
+```{r echo=TRUE}
+labels <- c("Legit","Fraud")
+labels <- paste(labels, round(100*prop.table(table(credit_card$Class)), 2))
+labels <- paste0(labels, "%")
+pie(table(credit_card$Class), labels, col = c("orange","Red"), main="Piechart of credit card transection")
+```
+
+## Note : 
+
+#### Now after seeing the data I have noticed that there are major difference between amount of data, We have a lot more legit transaction data then the fraud transaction data. As solution for this we will create synthetic samples with techniques like random over sampling, randome under sampling , SMOTE etc. But first lets look at no model prediction
+
+## No model prediction
+
+Here I am predicting data without any model on Class factor and then based on that I am getting a confusion matrix. For that I am using "caret" module.
+```{r echo=TRUE}
+#No model predictions
+predictions <- rep.int(0, nrow(credit_card))
+predictions<- factor(predictions, levels = c(0,1))
+library(caret)
+confusionMatrix(data=predictions, reference = credit_card$Class)
+```
+
+```{r echo=TRUE}
+library(dplyr)
+
+set.seed(1)
+credit_card <- credit_card %>% sample_frac(0.1)
+
+table(credit_card$Class)
+
+library(ggplot2)
+
+ggplot(data = credit_card, aes(x = V1, y = V2, col = Class)) + 
+  geom_point()
+```
+
+## Training and test sets for our model
+Creating training and Test sets for fraud Detection Model  using library caTools. Our training data contains 80% of total data and test data contains 20% of total data.
+```{r echo=TRUE}
+library(caTools)
+
+set.seed(123)
+
+data_sample = sample.split(credit_card$Class, SplitRatio = 0.80)
+
+train_data = subset(credit_card, data_sample==TRUE)
+
+test_data = subset(credit_card,data_sample==FALSE)
+
+print(dim(train_data))
+print(dim(test_data))
+```
+
+## Creating synthetic samples of training data
+
+## Note:
+
+#### I have used ROS(random over sampling), RUS(Random under sampling), ROS and RUS both and SMOTE. From all this SMOTE was the best at giving high quality data. So I am mentioning that steps as I have used that data to train my model
+
+Using SMOTE to balance the dataset
+```{r echo=TRUE}
+library(smotefamily)
+table(train_data$Class)
+```
+set the number of fraud and legitimate cases and the desired percentage of legitimate cases
+```{r echo=TRUE}
+n0 <- 22750
+n1 <- 35
+r0 <- 0.6
+```
+Calculate number of How many times we have to run the SMOTE 
+```{r echo=TRUE}
+ntimes <- ((1-r0)/r0)*(n0/n1)-1
+```
+Applying SMOTE
+```{r echo=TRUE}
+smote_output = SMOTE(X = train_data[,-c(1,31)],
+                     target = train_data$Class,
+                     K = 5,
+                     dup_size = ntimes)
+credit_smote <- smote_output$data
+```
+Renaming column 30 to "Class"
+```{r echo=TRUE}
+colnames(credit_smote)[30] <- "Class"
+```
+printing probability distribution to check whether we got desired data or not
+```{r echo=TRUE}
+print(prop.table(table(credit_smote$Class)))
+```
+Class distribution for original dataset
+```{r echo=TRUE}
+ggplot(credit_smote, aes(x = V1, y=V2, color = Class)) +
+  geom_point() +
+  scale_color_manual(values = c('dodgerblue2', 'red'))
+```
+Class distribution for over sampled dataset using SMOTE
+```{r echo=TRUE}
+ggplot(credit_smote, aes(x = V1, y=V2, color = Class)) +
+  geom_point() +
+  scale_color_manual(values = c('dodgerblue2', 'red'))
+```
+
+## Decision Tree with trained model
+we will use "rpart" and "rpart.plot" module
+```{r echo=TRUE}
+library(rpart)
+library(rpart.plot)
+```
+
+Training KNN model on the SMOTE data
+```{r echo=TRUE}
+CART_MODEL <- rpart(Class ~ ., credit_smote)
+rpart.plot(CART_MODEL, extra = 0, type = 5, tweak = 1.2)
+```
+predict fraud classes
+```{r echo=TRUE}
+predicted_val <- predict(CART_MODEL, test_data, type = 'class')
+```
+Build confusion matrix on predicted value of train data
+```{r echo=TRUE}
+confusionMatrix(predicted_val, test_data$Class)
+```
+## Predicting based on whole test data
+```{r echo=TRUE}
+predicted_val <- predict(CART_MODEL, credit_card[,-1], type = 'class')
+confusionMatrix(predicted_val, credit_card$Class)
+```
+

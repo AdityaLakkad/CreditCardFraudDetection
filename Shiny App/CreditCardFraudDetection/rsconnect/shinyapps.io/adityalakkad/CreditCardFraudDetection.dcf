@@ -1,0 +1,13 @@
+name: CreditCardFraudDetection
+title: CreditCardFraudDetection
+username:
+account: adityalakkad
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3016256
+bundleId: 3770562
+url: https://adityalakkad.shinyapps.io/CreditCardFraudDetection/
+when: 1603371385.90746
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: train.csv
